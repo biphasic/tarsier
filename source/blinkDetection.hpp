@@ -35,36 +35,41 @@ public:
       _yGridFocus = static_cast<int>(event.y / _yGridSize);
 
       _currentTimeStamp = event.timestamp;
-      _lastTimeStamp = _grid[_xGridFocus][_yGridFocus].first;
+      _lastTimeStamp = _latestTimestampGrid[_xGridFocus][_yGridFocus];
 
       for (size_t i = 0; i <= 15; i++) {
+        // tile that was activated
         if (i == _xGridFocus) {
-          _grid[i][_yGridFocus].second *=
+          _activityGrid[i][_yGridFocus] *=
               exp(-static_cast<double>(_currentTimeStamp -
-                                       _grid[i][_yGridFocus].first) /
+                                       _latestTimestampGrid[i][_yGridFocus]) /
                   _lifespan);
-          _grid[i][_yGridFocus].first = _currentTimeStamp;
+          _latestTimestampGrid[i][_yGridFocus] = _currentTimeStamp;
           // increase activity only in currently focused tile
-          _grid[i][_yGridFocus].second += 1;
+          _activityGrid[i][_yGridFocus] += 1;
           continue;
         }
-        if (_grid[i][_yGridFocus].second > _lowerThreshold) {
-          _grid[i][_yGridFocus].second *=
+
+        // only update tiles that are beyond the lower threshold. Values below
+        // are of no interest to an exponential decay
+        if (_activityGrid[i][_yGridFocus] > _lowerThreshold) {
+          _activityGrid[i][_yGridFocus] *=
               exp(-static_cast<double>(_currentTimeStamp -
-                                       _grid[i][_yGridFocus].first) /
+                                       _latestTimestampGrid[i][_yGridFocus]) /
                   _lifespan);
-          _grid[i][_yGridFocus].first = _currentTimeStamp;
+          _latestTimestampGrid[i][_yGridFocus] = _currentTimeStamp;
         }
 
         if (_xGridFocus != i &&
-            _lowerThreshold < _grid[i][_yGridFocus].second &&
-            _grid[i][_yGridFocus].second < _upperThreshold) {
+            _lowerThreshold < _activityGrid[i][_yGridFocus] &&
+            _activityGrid[i][_yGridFocus] < _upperThreshold) {
           otherBlink.push_back(i);
         }
       }
 
-      if (_lowerThreshold < _grid[_xGridFocus][_yGridFocus].second &&
-          _grid[_xGridFocus][_yGridFocus].second < _upperThreshold &&
+      // check whether it
+      if (_lowerThreshold < _activityGrid[_xGridFocus][_yGridFocus] &&
+          _activityGrid[_xGridFocus][_yGridFocus] < _upperThreshold &&
           otherBlink.size() == 1 &&
           abs((otherBlink.back() - _xGridFocus)) == 2) {
         _isBlink = true;
@@ -88,7 +93,10 @@ protected:
   unsigned short int _xGridFocus;
   unsigned short int _yGridFocus;
   std::vector<unsigned short int> otherBlink;
-  std::pair<long, double> _grid[16][12];
+  long _latestTimestampGrid[16][12];
+  double _activityGrid[16][12];
+  bool _blinkIndicatorGrid[16][12];
+  long _blinkBeginTSGrid[16][12];
   bool _isBlink;
   uint64_t _lowerThreshold;
   uint64_t _upperThreshold;
