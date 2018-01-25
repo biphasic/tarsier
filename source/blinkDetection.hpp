@@ -37,25 +37,37 @@ public:
       _currentTimeStamp = event.timestamp;
       _lastTimeStamp = _grid[_xGridFocus][_yGridFocus].first;
 
-      for (size_t i = 0; i < 16; i++) {
-        _grid[i][_yGridFocus].second *=
-            exp(-static_cast<double>(_currentTimeStamp -
-                                     _grid[i][_yGridFocus].first) /
-                _lifespan);
+      for (size_t i = 0; i < 15; i++) {
+        if (_grid[i][_yGridFocus].second > 0.01) {
+          _grid[i][_yGridFocus].second *=
+              exp(-static_cast<double>(_currentTimeStamp -
+                                       _grid[i][_yGridFocus].first) /
+                  _lifespan);
+        }
         _grid[i][_yGridFocus].first = _currentTimeStamp;
         std::cout << "Initial tile was " << _xGridFocus << "/" << _yGridFocus
                   << ", activity at tile " << i << " is "
                   << _grid[i][_yGridFocus].second << '\n';
+
+        if (_xGridFocus != i &&
+            _lowerThreshold < _grid[i][_yGridFocus].second &&
+            _grid[i][_yGridFocus].second < upperThreshold) {
+          otherBlink.push_back(i);
+        }
       }
 
+      // increase activity only in currently focused tile
       _grid[_xGridFocus][_yGridFocus].second += 1;
 
       if (_lowerThreshold < _grid[_xGridFocus][_yGridFocus].second &&
-          _grid[_xGridFocus][_yGridFocus].second < _upperThreshold) {
+          _grid[_xGridFocus][_yGridFocus].second < _upperThreshold &&
+          otherBlink.size() == 1 &&
+          abs((otherBlink.back() - _xGridFocus)) == 2) {
         _isBlink = true;
       } else {
         _isBlink = false;
       }
+      otherBlink.clear();
 
       _handleBlinkEvent(_blinkEventFromEvent(event, _isBlink));
     }
@@ -71,6 +83,7 @@ protected:
   unsigned short int _yGridSize;
   unsigned short int _xGridFocus;
   unsigned short int _yGridFocus;
+  std::vector<unsigned short int> otherBlink;
   std::pair<long, double> _grid[16][12];
   bool _isBlink;
   uint64_t _lowerThreshold;
