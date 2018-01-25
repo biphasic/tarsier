@@ -20,7 +20,7 @@ public:
             std::forward<HandleBlinkEvent>(handleBlinkDetectionEvent)),
         _lifespan(lifespan), _lowerThreshold(lowerThreshold),
         _upperThreshold(upperThreshold), _lastTimeStamp(0), _xGridSize(19),
-        _yGridSize(20), _isBlink(false) {}
+        _yGridSize(20), _isBlink(false), _counter(0) {}
 
   BlinkDetection(const BlinkDetection &) = delete;
   BlinkDetection(BlinkDetection &&) = default;
