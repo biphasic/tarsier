@@ -71,7 +71,7 @@ public:
             if (_activityGrid[i][_row] < (_lowerThreshold - 15)) {
               std::cout << i << "/" << _row << "-" << '\n';
               _blinkIndicatorGrid[i][_row] = 1;
-              _blinkVector.push_back(std::make_pair(
+              _blinkCandidateVector.push_back(std::make_pair(
                   i, static_cast<long>((_latestTimestampGrid[i][_row] -
                                         _blinkBeginTSGrid[i][_row]) /
                                        2) +
@@ -97,13 +97,33 @@ public:
 
       // check whether central timestamps of the last two blinking candidates
       // (eyes) are not more than 50ms apart and candidates are two tiles apart
-      // std::pair<int, long> previousBlink = *(_blinkVector.rbegin() + 1);
-      if (_blinkVector.size() > 1 &&
-          abs((_blinkVector.rbegin() + 1)->second -
-              _blinkVector.back().second) < 50000 &&
-          abs(((_blinkVector.rbegin() + 1)->first - _col)) == 2) {
-        _isBlink = true;
-        _blinkVector.clear();
+      // std::pair<int, long> previousBlink = *(_blinkCandidateVector.rbegin() +
+      // 1);
+
+      if (_blinkCandidateVector.size() > 1 &&
+          abs((_blinkCandidateVector.rbegin() + 1)->second -
+              _blinkCandidateVector.back().second) < 50000 &&
+          abs(((_blinkCandidateVector.rbegin() + 1)->first -
+               _blinkCandidateVector.back().first)) == 2)
+      //|| abs(((_blinkCandidateVector.rbegin() + 1)->first -
+      //_blinkCandidateVector.back().first)) == 1)
+      {
+
+        _blinkVector.push_back(
+            std::make_pair(((_blinkCandidateVector.rbegin() + 1)->first +
+                            _blinkCandidateVector.back().first) /
+                               2,
+                           ((_blinkCandidateVector.rbegin() + 1)->second +
+                            _blinkCandidateVector.back().second) /
+                               2));
+        if (_blinkVector.size() > 1 &&
+            (_blinkVector.back().first - (_blinkVector.rbegin() + 1)->first) <
+                2 &&
+            (_blinkVector.back().second - (_blinkVector.rbegin() + 1)->second) >
+                800000) {
+          _isBlink = true;
+          _blinkCandidateVector.clear();
+        }
       } else {
         _isBlink = false;
       }
@@ -123,6 +143,7 @@ protected:
   unsigned short int _col;
   unsigned short int _row;
   std::vector<unsigned short int> otherBlink;
+  std::vector<std::pair<int, long>> _blinkCandidateVector;
   std::vector<std::pair<int, long>> _blinkVector;
   long _latestTimestampGrid[16][12];
   double _activityGrid[16][12];
