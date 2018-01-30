@@ -103,19 +103,18 @@ public:
       if (_blinkCandidateVector.size() > 1 &&
           abs((_blinkCandidateVector.rbegin() + 1)->second -
               _blinkCandidateVector.back().second) < 50000 &&
-          abs(((_blinkCandidateVector.rbegin() + 1)->first -
-               _blinkCandidateVector.back().first)) == 2)
-      //|| abs(((_blinkCandidateVector.rbegin() + 1)->first -
-      //_blinkCandidateVector.back().first)) == 1)
-      {
+          (abs(((_blinkCandidateVector.rbegin() + 1)->first -
+                _blinkCandidateVector.back().first)) == 2 ||
+           abs(((_blinkCandidateVector.rbegin() + 1)->first -
+                _blinkCandidateVector.back().first)) == 1)) {
 
-        _blinkVector.push_back(
-            std::make_pair(((_blinkCandidateVector.rbegin() + 1)->first +
-                            _blinkCandidateVector.back().first) /
-                               2,
-                           ((_blinkCandidateVector.rbegin() + 1)->second +
-                            _blinkCandidateVector.back().second) /
-                               2));
+        _blinkVector.push_back(std::make_pair(
+            static_cast<int>(((_blinkCandidateVector.rbegin() + 1)->first +
+                              _blinkCandidateVector.back().first) /
+                             2),
+            ((_blinkCandidateVector.rbegin() + 1)->second +
+             _blinkCandidateVector.back().second) /
+                2));
         if (_blinkVector.size() > 1 &&
             (_blinkVector.back().first - (_blinkVector.rbegin() + 1)->first) <
                 2 &&
