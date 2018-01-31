@@ -20,7 +20,7 @@ public:
             std::forward<HandleBlinkEvent>(handleBlinkDetectionEvent)),
         _lifespan(lifespan), _lowerThreshold(lowerThreshold),
         _upperThreshold(upperThreshold), _lastTimeStamp(0), _xGridSize(19),
-        _yGridSize(20), _isBlink(false), _counter(0) {}
+        _yGridSize(20), _isBlink(false), _x2(0), _y2(0), _counter(0) {}
 
   BlinkDetection(const BlinkDetection &) = delete;
   BlinkDetection(BlinkDetection &&) = default;
@@ -54,6 +54,7 @@ public:
 
           // state machine
           switch (_blinkIndicatorGrid[i][_row]) {
+          // BACKGROUND STATE
           case 1:
             // see if activity has risen above lowerThreshold to set blink
             // candidate, state to 2
@@ -65,10 +66,11 @@ public:
               std::cout << "This shouldn't have happened" << '\n';
             }
             break;
+          // POSSIBLE BLINK STATE
           case 2:
             // check whether activity may dropped below threshold plus some
             // safety margin
-            if (_activityGrid[i][_row] < (_lowerThreshold - 15)) {
+            if (_activityGrid[i][_row] < (_lowerThreshold - 10)) {
               std::cout << i << "/" << _row << "-" << '\n';
               _blinkIndicatorGrid[i][_row] = 1;
               _blinkCandidateVector.push_back(std::make_pair(
@@ -81,6 +83,7 @@ public:
               std::cout << i << "/" << _row << "[++]" << '\n';
             }
             break;
+          // CLUTTER STATE
           case 3:
             if (_activityGrid[i][_row] < _lowerThreshold) {
               _blinkIndicatorGrid[i][_row] = 1;
@@ -88,6 +91,7 @@ public:
             }
             break;
           default:
+            // TODO refactor
             _blinkIndicatorGrid[i][_row] = 1;
             std::cout << "set state for first time. " << '\n';
             break;
@@ -149,6 +153,8 @@ protected:
   int _blinkIndicatorGrid[16][12];
   long _blinkBeginTSGrid[16][12];
   bool _isBlink;
+  int _x2;
+  int _y2;
   uint64_t _lowerThreshold;
   uint64_t _upperThreshold;
   long _counter;
