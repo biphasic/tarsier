@@ -50,10 +50,10 @@ public:
 
         // state machine
         switch (_grid[i][_row].state) {
+
         // too little activity
         case State::background:
-          // see if activity has risen above lowerThreshold to set blink
-          // candidate, state to 2
+          // in case activity has risen above lowerThreshold -> candidate
           if (_grid[i][_row].activity > _lowerThreshold) {
             _grid[i][_row].state = State::candidate;
             _grid[i][_row].blinkBeginTimestamp = _currentTimeStamp;
@@ -62,10 +62,10 @@ public:
             throw std::logic_error("Skipped a state");
           }
           break;
+
         // within thresholds, possible blink
         case State::candidate:
-          // check whether activity may dropped below threshold plus some
-          // safety margin
+          // in case activity dropped below lower threshold -> register blink
           if (_grid[i][_row].activity < (_lowerThreshold - 10)) {
             std::cout << i << "/" << _row << "-" << '\n';
             _grid[i][_row].state = State::background;
@@ -74,11 +74,9 @@ public:
             candidate.x = event.x;
             candidate.y = event.y;
             auto blinkBeginTimestamp = _grid[i][_row].blinkBeginTimestamp;
-            candidate.meanTimestamp =
-                static_cast<long>((_currentTimeStamp - blinkBeginTimestamp) /
-                                  2) +
-                blinkBeginTimestamp;
             candidate.duration = _currentTimeStamp - blinkBeginTimestamp;
+            candidate.meanTimestamp =
+                static_cast<long>(candidate.duration / 2) + blinkBeginTimestamp;
             _blinkCandidates[_row].push_back(candidate);
             // delete blinkBeginTimestamp;
             // delete candidate;
@@ -87,6 +85,7 @@ public:
             std::cout << i << "/" << _row << "[++]" << '\n';
           }
           break;
+
         // too much activity
         case State::clutter:
           if (_grid[i][_row].activity < _lowerThreshold) {
@@ -94,6 +93,7 @@ public:
             std::cout << i << "/" << _row << "[--]" << '\n';
           }
           break;
+
         default:
           // TODO refactor
           _grid[i][_row].state = State::background;
@@ -103,7 +103,7 @@ public:
       }
     }
 
-    // check whether central timestamps of the last two blinking candidates
+    // check whether mean timestamps of the last two blinking candidates
     // (eyes) are not more than 50ms apart and candidates are two tiles apart
     if (_blinkCandidates[_row].size() > 1 &&
         abs((_blinkCandidates[_row].rbegin() + 1)->meanTimestamp -
@@ -115,6 +115,25 @@ public:
          //_blinkCandidateVector[_row].back().first)) == 1
          )) {
 
+      Blink blink;
+      if ((_blinkCandidates[_row].rbegin() + 1)->tileIndex <
+          _blinkCandidates[_row].back().tileIndex) {
+        blink.leftEye = *(_blinkCandidates[_row].rbegin() + 1);
+        blink.rightEye = _blinkCandidates[_row].back();
+      } else {
+        blink.leftEye = _blinkCandidates[_row].back();
+        blink.rightEye = *(_blinkCandidates[_row].rbegin() + 1);
+      }
+      blink.centralTileIndex =
+          (blink.leftEye.tileIndex + blink.rightEye.tileIndex) / 2;
+      blink.centralTimestamp = static_cast<long>(
+          (blink.leftEye.meanTimestamp - blink.rightEye.meanTimestamp) / 2);
+      blink.duration = static_cast<long>(
+          (blink.leftEye.duration + blink.rightEye.duration) / 2);
+
+      _blinks[_row].push_back(blink);
+
+      /*
       _blinkVector[_row].push_back(std::make_pair(
           static_cast<int>(((_blinkCandidates[_row].rbegin() + 1)->tileIndex +
                             _blinkCandidates[_row].back().tileIndex) /
@@ -122,16 +141,18 @@ public:
           ((_blinkCandidates[_row].rbegin() + 1)->meanTimestamp +
            _blinkCandidates[_row].back().meanTimestamp) /
               2));
-      if (_blinkVector[_row].size() > 1 &&
-          (_blinkVector[_row].back().first -
-           (_blinkVector[_row].rbegin() + 1)->first) < 2 &&
-          (_blinkVector[_row].back().second -
-           (_blinkVector[_row].rbegin() + 1)->second) > 800000 &&
-          (_blinkVector[_row].back().second -
-           (_blinkVector[_row].rbegin() + 1)->second) < 4000000) {
+              */
+
+      if (_blinks[_row].size() > 1 &&
+          (_blinks[_row].back().centralTileIndex -
+           (_blinks[_row].rbegin() + 1)->centralTileIndex) < 1 &&
+          800000 < (_blinks[_row].back().centralTimestamp -
+                    (_blinks[_row].rbegin() + 1)->centralTimestamp) < 4000000) {
         _isBlink = true;
-        _x2 = ((_blinkCandidates[_row].rbegin() + 1)->tileIndex) * 19 + 10;
-        _y2 = _row * 20 + 10;
+        event.x = _blinks[_row].back().leftEye.x;
+        event.y = _blinks[_row].back().leftEye.y;
+        _x2 = _blinks[_row].back().rightEye.x;
+        _y2 = _blinks[_row].back().rightEye.y;
         std::cout << "_x2: " << _x2 << " and _y2: " << _y2 << '\n';
         _blinkCandidates[_row].clear();
       }
@@ -167,25 +188,26 @@ protected:
   struct Blink {
     BlinkCandidate leftEye;
     BlinkCandidate rightEye;
+    float centralTileIndex;
+    long centralTimestamp;
+    long duration;
   };
 
   BlinkEventFromEvent _blinkEventFromEvent;
   const long _lifespan;
+  double _lowerThreshold;
+  double _upperThreshold;
   long _currentTimeStamp;
   short _xGridSize;
   short _yGridSize;
   short _col;
   short _row;
-  std::vector<std::pair<int, long>> _blinkCandidateVector[12];
-  std::vector<BlinkCandidate> _blinkCandidates[12];
-  std::vector<std::pair<int, long>> _blinkVector[12];
-  std::vector<Blink> _blinks[12];
-  Tile _grid[16][12];
-  bool _isBlink;
   short _x2;
   short _y2;
-  double _lowerThreshold;
-  double _upperThreshold;
+  bool _isBlink;
+  std::vector<BlinkCandidate> _blinkCandidates[12];
+  std::vector<Blink> _blinks[12];
+  Tile _grid[16][12];
   HandleBlinkEvent _handleBlinkEvent;
 };
 
