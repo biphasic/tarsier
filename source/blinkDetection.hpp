@@ -29,70 +29,69 @@ public:
   virtual ~BlinkDetection() {}
 
   virtual void operator()(Event event) {
-    if (event.timestamp > 500000 && event.x != 304 && event.y != 240) {
-      // std::cout << _counter++ << '\n';
+    if (event.timestamp > 500000) {
       _col = static_cast<int>(event.x / _xGridSize);
       _row = static_cast<int>(event.y / _yGridSize);
 
       _currentTimeStamp = event.timestamp;
-      _lastTimeStamp = _latestTimestampGrid[_col][_row];
+      _lastTimeStamp = _grid[_col][_row].latestTimestamp;
 
       // updating activities
       for (size_t i = 0; i <= 15; i++) {
         // only update tiles that are beyond the lower threshold. Values below
         // are of no interest to an exponential decay
-        if (_activityGrid[i][_row] > _lowerThreshold || i == _col) {
-          _activityGrid[i][_row] *=
+        if (_grid[i][_row].activity > _lowerThreshold || i == _col) {
+          _grid[i][_row].activity *=
               exp(-static_cast<double>(_currentTimeStamp -
-                                       _latestTimestampGrid[i][_row]) /
+                                       _grid[i][_row].latestTimestamp) /
                   _lifespan);
-          _latestTimestampGrid[i][_row] = _currentTimeStamp;
+          _grid[i][_row].latestTimestamp = _currentTimeStamp;
           if (i == _col) {
             // increase activity only in currently focused tile
-            _activityGrid[i][_row] += 1;
+            _grid[i][_row].activity += 1;
           }
 
           // state machine
-          switch (_blinkIndicatorGrid[i][_row]) {
-          // BACKGROUND STATE
-          case 1:
+          switch (_grid[i][_row].state) {
+          // too little activity
+          case State::background:
             // see if activity has risen above lowerThreshold to set blink
             // candidate, state to 2
-            if (_activityGrid[i][_row] > _lowerThreshold) {
-              _blinkIndicatorGrid[i][_row] = 2;
-              _blinkBeginTSGrid[i][_row] = _currentTimeStamp;
+            if (_grid[i][_row].activity > _lowerThreshold) {
+              _grid[i][_row].state = State::candidate;
+              _grid[i][_row].blinkBeginTimestamp = _currentTimeStamp;
               std::cout << i << "/" << _row << "+" << '\n';
-            } else if (_activityGrid[i][_row] > _upperThreshold) {
-              std::cout << "This shouldn't have happened" << '\n';
+            } else if (_grid[i][_row].activity > _upperThreshold) {
+              throw std::logic_error("Skipped a state");
             }
             break;
-          // POSSIBLE BLINK STATE
-          case 2:
+          // within thresholds, possible blink
+          case State::candidate:
             // check whether activity may dropped below threshold plus some
             // safety margin
-            if (_activityGrid[i][_row] < (_lowerThreshold - 10)) {
+            if (_grid[i][_row].activity < (_lowerThreshold - 10)) {
               std::cout << i << "/" << _row << "-" << '\n';
-              _blinkIndicatorGrid[i][_row] = 1;
+              _grid[i][_row].state = State::background;
               _blinkCandidateVector[_row].push_back(std::make_pair(
-                  i, static_cast<long>((_latestTimestampGrid[i][_row] -
-                                        _blinkBeginTSGrid[i][_row]) /
+                  i, static_cast<long>((_grid[i][_row].latestTimestamp -
+                                        _grid[i][_row].blinkBeginTimestamp) /
                                        2) +
-                         _blinkBeginTSGrid[i][_row]));
-            } else if (_activityGrid[i][_row] > _upperThreshold) {
-              _blinkIndicatorGrid[i][_row] = 3; // considered clutter now
+                         _grid[i][_row].blinkBeginTimestamp));
+            } else if (_grid[i][_row].activity > _upperThreshold) {
+              _grid[i][_row].state = State::clutter; // considered clutter now
               std::cout << i << "/" << _row << "[++]" << '\n';
             }
             break;
-          // CLUTTER STATE
-          case 3:
-            if (_activityGrid[i][_row] < _lowerThreshold) {
-              _blinkIndicatorGrid[i][_row] = 1;
+          // too much activity
+          case State::clutter:
+            if (_grid[i][_row].activity < _lowerThreshold) {
+              _grid[i][_row].state = State::background;
               std::cout << i << "/" << _row << "[--]" << '\n';
             }
             break;
           default:
             // TODO refactor
-            _blinkIndicatorGrid[i][_row] = 1;
+            _grid[i][_row].state = State::background;
             std::cout << "set state for first time. " << '\n';
             break;
           }
@@ -141,28 +140,50 @@ public:
   }
 
 protected:
+  enum class State {
+    background,
+    candidate,
+    clutter,
+  };
+
+  struct Tile {
+    long latestTimestamp;
+    long blinkBeginTimestamp;
+    double activity;
+    State state;
+  };
+
+  struct BlinkCandidate {
+    const short tileIndex;
+    const short x;
+    const short y;
+    const long meanTimestamp;
+    const long duration;
+  };
+
+  struct Blink {
+    BlinkCandidate leftEye;
+    BlinkCandidate rightEye;
+  };
+
   BlinkEventFromEvent _blinkEventFromEvent;
-  const uint64_t _lifespan;
-  uint64_t _currentTimeStamp;
-  uint64_t _lastTimeStamp;
-  // double _activity;
-  unsigned short int _xGridSize;
-  unsigned short int _yGridSize;
-  unsigned short int _col;
-  unsigned short int _row;
-  std::vector<unsigned short int> otherBlink;
+  const long _lifespan;
+  long _currentTimeStamp;
+  long _lastTimeStamp;
+  short _xGridSize;
+  short _yGridSize;
+  short _col;
+  short _row;
   std::vector<std::pair<int, long>> _blinkCandidateVector[12];
+  std::vector<BlinkCandidate> _blinkCandidates[12];
   std::vector<std::pair<int, long>> _blinkVector[12];
-  long _latestTimestampGrid[16][12];
-  double _activityGrid[16][12];
-  int _blinkIndicatorGrid[16][12];
-  long _blinkBeginTSGrid[16][12];
+  std::vector<Blink> _blinks[12];
+  Tile _grid[16][12];
   bool _isBlink;
   int _x2;
   int _y2;
-  uint64_t _lowerThreshold;
-  uint64_t _upperThreshold;
-  long _counter;
+  double _lowerThreshold;
+  double _upperThreshold;
   HandleBlinkEvent _handleBlinkEvent;
 };
 
